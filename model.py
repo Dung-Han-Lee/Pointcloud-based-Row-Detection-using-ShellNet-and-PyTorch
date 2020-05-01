@@ -73,6 +73,21 @@ class Lift(nn.Module):
             outputs = F.relu(self.linear2(outputs))
             return outputs
 
+class ShellConv(nn.Module):
+    def __init__(self, num_feature, num_neighbor, num_shell, is_batchnorm=True):
+        super(Lift, self).__init__() 
+
+        self.K = num_neighbor
+        self.D = num_shell
+        self.C = num_feature
+        self.lift = Lift(3, 64)
+
+    def forward(self, points, queries, feat_prev):
+        nn_pts       = knn(points, queries, self.K)
+        nn_center    = queries.unsqueeze(3)
+        nn_points_local = nn_center - nn_pts
+        nn_feat_local = self.lift(nn_points_local)
+
 
 N, M = 32, 1024
 # Create random Tensors to hold inputs and outputs
