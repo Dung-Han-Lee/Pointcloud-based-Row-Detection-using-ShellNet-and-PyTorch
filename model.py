@@ -18,34 +18,65 @@ def knn_one_batch(points, queries, K):
     Outputs:
         nn one batch : L x M x K x 3 tensor (sorted K nearest neighbor)
     """
-    res = None
-    num_batch = points.shape[0]
-    for i in range(num_batch):
+    value = None
+    indices = None
+    for i in range(points.shape[0]):
         point = points[i]
         query = queries[i]
         dist  = torch.cdist(point, query)
         idxs  = dist.topk(K, dim=0, largest=False, sorted=True).indices
-        nn    = point[idxs].transpose(0,1).unsqueeze(0)
-        res   = nn if res is None else torch.cat((res, nn))
-    return res 
+        idxs  = idxs.transpose(0,1)
+        nn    = point[idxs].unsqueeze(0)
+        value = nn if value is None else torch.cat((value, nn))
+
+        idxs  = idxs.unsqueeze(0)
+        indices = idxs if indices is None else torch.cat((indices, idxs))
+        
+    return value, indices
 
 def knn(points, queries, K):
     """
     Args:
-        points: B x L x 3 x N tensor
-        query : B x L x 3 x M tensor, M < N
+        points: B x L x N x 3 tensor
+        query : B x L x M x 3 tensor, M < N
         K     : num of neighbors (constant)
     Outputs:
-        knn   : B x L x 3 x KM tensor (sorted K nearest neighbor)
+        knn   : B x L x M x K x 3 tensor (sorted K nearest neighbor)
     """
     num_batch = points.shape[0]
-    res = None
+    value = None
+    indices = None
     for i in range(num_batch):
         point_batch = points[i]
         query_batch = queries[i]
-        knn_batch = knn_one_batch(point_batch, query_batch, K)
+        knn_batch, idx_batch = knn_one_batch(point_batch, query_batch, K)
         knn_batch = knn_batch.unsqueeze(0)
-        res = knn_batch if res is None else torch.cat(res, knn_batch)
+        idx_batch = idx_batch.unsqueeze(0)
+        value   = knn_batch if value is None else torch.cat((value, knn_batch))
+        indices = idx_batch if indices is None else torch.cat((indices, idx_batch))
+    return value, indices
+
+def gather_feature(feat, indices):
+    """
+    This function uses the indices generated in knn to gather associated
+    feature in the previous layer. This implementation is an inefficient
+    workaround.
+
+    Args:
+        input  : B x L x N x K x F tensor
+        indices: B x L x N x K tensor
+    Output:
+
+    """
+
+    res = None
+    for B, point2d in enumerate(test_input):
+        one_batch = None
+        for L, point1d in enumerate(point2d):
+            pt = point1d[indices[B][L]].unsqueeze(0)
+            one_batch = pt if one_batch is None else torch.cat((one_batch, pt))
+        one_batch = one_batch.unsqueeze(0)
+        res = one_batch if res is None else torch.cat((res, one_batch))
     return res
 
 
@@ -54,18 +85,20 @@ class Lift(nn.Module):
         super(Lift, self).__init__()    
 
         self.is_batchnorm = is_batchnorm
+
+        self.bn1 = nn.BatchNorm3d(3)
         self.linear1 = nn.Linear(in_size, out_size // 2)
-        self.bn1 = nn.BatchNorm3d(out_size // 2)
+        self.bn2 = nn.BatchNorm3d(out_size // 2)
         self.linear2 = nn.Linear(out_size // 2, out_size)
-        self.bn2 = nn.BatchNorm3d(out_size)
+
 
     def forward(self, inputs):
 
         if self.is_batchnorm == True:
-            outputs = self.linear1(inputs)
-            outputs = F.relu(self.bn1(outputs.transpose(1,4))).transpose(1,4)
-            outputs = self.linear2(outputs)
-            outputs = F.relu(self.bn2(outputs.transpose(1,4))).transpose(1,4)
+            outputs = self.bn1(inputs.transpose(1,4)).transpose(1,4)
+            outputs = F.relu(self.linear1(outputs))
+            outputs = self.bn2(outputs.transpose(1,4)).transpose(1,4)
+            outputs = F.relu(self.linear2(outputs))
             return outputs
 
         else:
@@ -73,26 +106,39 @@ class Lift(nn.Module):
             outputs = F.relu(self.linear2(outputs))
             return outputs
 
+
 class ShellConv(nn.Module):
-    def __init__(self, num_feature, num_neighbor, num_shell, is_batchnorm=True):
+    def __init__(self, num_feature, num_neighbor, num_division, is_batchnorm=True):
         super(Lift, self).__init__() 
 
+        s = int(num_neighbor/num_division)
         self.K = num_neighbor
-        self.D = num_shell
         self.C = num_feature
         self.lift = Lift(3, 64)
+        self.maxpool = nn.Maxpool3d((1, s, 1), stride = (1,s,1))
 
     def forward(self, points, queries, feat_prev):
-        nn_pts       = knn(points, queries, self.K)
+        
+        nn_pts, idxs = knn(points, queries, self.K)
         nn_center    = queries.unsqueeze(3)
         nn_points_local = nn_center - nn_pts
+
         nn_feat_local = self.lift(nn_points_local)
 
+        if feat_prev is not None:
+            feat_prev = gather_feature(feat_prev, idxs)
+            feat_cat  = torch.cat((nn_feat_local, feat_prev), dim = -1)
+        else
+            feat_cat  = nn_feat_local
 
-N, M = 32, 1024
+        feat_max = self.maxpool(feat_cat)
+        return feat_max
+
+
+B , N, M = 1, 32, 1024
 # Create random Tensors to hold inputs and outputs
-p = torch.randn(1, N, M, 3)
-q = torch.randn(1, N, M//2, 3)
+p = torch.randn(B, N, M, 3)
+q = torch.randn(B, N, M//2, 3)
 
 # Construct our model by instantiating the class defined above
 
@@ -110,10 +156,20 @@ queries[1] = torch.Tensor([[3], [3], [3]])
 test_input = test_input.permute(0,2,1).unsqueeze(0) 
 queries = queries.permute(0,2,1).unsqueeze(0)
 
+test_input = p
+value, indices = knn(test_input, q, 32)
+
+#print(value.shape)
+#print(indices.shape)
+#res = gather_feature(test_input, indices)
+#print(torch.all(torch.eq(value, res)))
+#print(knn(test_input, queries, 2).shape)
+
+
 model = Lift(3, 64, True)
 #print(model(test_input, queries).shape)
 
-nn_pts = knn(p, q, 32)
+nn_pts, indices = knn(p, q, 32)
 nn_center = q.unsqueeze(3)
 nn_pts_local = nn_center - nn_pts
 
