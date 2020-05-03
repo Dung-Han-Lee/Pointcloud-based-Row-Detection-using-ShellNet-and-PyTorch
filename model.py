@@ -152,6 +152,9 @@ class ShellConv(nn.Module):
         knn_feat_max = self.maxpool(knn_feat_cat)
         output   = self.conv(knn_feat_max).permute(0,2,3,1)
 
+        print("knn_feat_local.shape = {}, feat_cat shape = {}, feat max shape = {}".format(
+            knn_feat_local.shape, knn_feat_cat.shape, knn_feat_max.shape))
+
         return output.squeeze(2)
 
 class ShellUp(nn.Module):
@@ -169,7 +172,7 @@ class ShellUp(nn.Module):
     def forward(self, points, queries, feat_prev, feat_skip_connect):
         sconv = self.sconv(points, queries, feat_prev)
         feat_cat = torch.cat((sconv, feat_skip_connect), dim=-1)
-
+        print("shell up feat_cat.shape = ",feat_cat.shape)
         if self.is_batchnorm == True:
             outputs = self.batchnorm(feat_cat.transpose(1,2)).transpose(1,2)
             outputs = self.linear(outputs)
@@ -200,7 +203,7 @@ class ShellNet(nn.Module):
             nn.Dropout(0),
             nn.ReLU(),
             nn.Linear(256,128),
-            nn.Dropout(0.0),
+            nn.Dropout(0.5),
             nn.ReLU(),
             nn.Linear(128, num_class),
             nn.ReLU()
@@ -210,29 +213,29 @@ class ShellNet(nn.Module):
         
         query1 = random_sample(inputs, self.num_points // 2)
         sconv1 = self.shellconv1(inputs, query1, None)
-        #print("sconv1.shape = ", sconv1.shape)
+        print("sconv1.shape = ", sconv1.shape)
 
         
         query2 = random_sample(query1, self.num_points // 4)
         sconv2 = self.shellconv2(query1, query2, sconv1)
-        #print("sconv2.shape = ", sconv2.shape)
+        print("sconv2.shape = ", sconv2.shape)
 
         query3 = random_sample(query2, self.num_points // 8)
         sconv3 = self.shellconv3(query2, query3, sconv2)
-        #print("sconv3.shape = ", sconv3.shape)        
+        print("sconv3.shape = ", sconv3.shape)        
         
         
         up3    = self.shellup3(query3, query2, sconv3, sconv2)
-        #print("up3.shape = ", up3.shape)
+        print("up3.shape = ", up3.shape)
 
         up2    = self.shellup2(query2, query1, up3   , sconv1)
-        #print("up2.shape = ", up2.shape)
+        print("up2.shape = ", up2.shape)
 
         up1    = self.shellup1(query1, inputs, up2)
-        #print("up1.shape = ", up1.shape)
+        print("up1.shape = ", up1.shape)
 
         output = self.fc(up1)
-        #print("output.shape = ", output.shape)
+        print("output.shape = ", output.shape)
 
         return output
 
@@ -241,45 +244,12 @@ B, M, K = 1, 1024, 32
 p = torch.randn(B, M, 3)
 q = torch.randn(B, M//2, 3)
 f = torch.randn(B, M, 128)
-y = torch.randint(0, 2, (B,M))
+y = torch.randn(B, M//2, 128)
 
 nn_pts, idxs = knn(p, q, 32)
 nn_center    = q.unsqueeze(2)
 nn_points_local = nn_center - nn_pts
 
-model = ShellNet(2, 1024, False)
-print(model)
 
-def cross_entropy(inputs, target, weight=None, size_average=True):
-    n, h, c = inputs.size()
-
-    # CHW -> HWC -> (HW) x c
-    inputs = inputs.contiguous().view(-1, c)
-    target = target.view(-1)    
-    loss = F.cross_entropy(inputs, target, weight=weight, 
-        size_average=size_average)
-    
-    return loss
-
-
-"""
-criterion = cross_entropy
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-for t in range(500):
-    # Forward pass: Compute predicted y by passing x to the model
-    y_pred = model(p)
-    # Compute and print loss
-    loss = criterion(y_pred, y)
-    #if t % 100 == 99:
-    print(t, loss.item())
-    # Zero gradients, perform a backward pass, and update the weights.
-    optimizer.zero_grad()
-    loss.backward()
-
-    '''
-    for name, param in model.named_parameters():
-        if param.grad is not None:
-            print(name, param.grad)
-    '''
-    optimizer.step()
-"""
+model = ShellNet(2, 1024)
+print(model(q).shape)
