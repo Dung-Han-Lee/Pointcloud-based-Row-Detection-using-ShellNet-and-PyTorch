@@ -56,9 +56,10 @@ def random_sample(points, num_sample):
     perm = torch.randperm(points.shape[1])
     return points[:, perm[:num_sample]].clone()
 
-class Lift(nn.Module):
-    def __init__(self, in_size, out_size, is_batchnorm=True):
-        super(Lift, self).__init__()    
+class Dense(nn.Module):
+    def __init__(self, in_size, out_size, in_dim=3, 
+            has_bn=True, drop_out=None):
+        super(Dense, self).__init__()    
         """
         Args:
             input ( B x M x K x 3  tensor ) -- subtraction vectors 
@@ -66,36 +67,43 @@ class Lift(nn.Module):
         Output: 
             local point feature ( B x M x K x 64 tensor ) 
         """
-        self.is_batchnorm = is_batchnorm
+        self.has_bn = has_bn
+        self.in_dim = in_dim
 
-        self.batchnorm1 = nn.BatchNorm2d(3)
-        self.linear1 = nn.Sequential(
-            nn.Linear(in_size, out_size // 2),
-            nn.ReLU()
-        )
-        self.batchnorm2 = nn.BatchNorm2d(out_size // 2)
-        self.linear2 = nn.Sequential(
-            nn.Linear(out_size // 2, out_size),
-            nn.ReLU()
-        )
-        
+        if in_dim == 3:
+            self.batchnorm = nn.BatchNorm1d(in_size)
+        elif in_dim == 4:
+            self.batchnorm = nn.BatchNorm2d(in_size)
+        else: 
+            self.batchnorm = None
+
+        if drop_out is None:
+            self.linear = nn.Sequential(
+                nn.Linear(in_size, out_size),
+                nn.ReLU()
+            )
+        else:
+            self.linear = nn.Sequential(
+                nn.Linear(in_size, out_size),
+                nn.ReLU(),
+                nn.Dropout(drop_out)
+            )            
+
     def forward(self, inputs):
 
-        if self.is_batchnorm == True:
-            outputs = self.batchnorm1(inputs.transpose(1,3)).transpose(1,3)
-            outputs = self.linear1(outputs)
-            outputs = self.batchnorm2(outputs.transpose(1,3)).transpose(1,3)
-            outputs = self.linear2(outputs)
+        if self.has_bn == True:
+            d =  self.in_dim - 1
+            outputs = self.batchnorm(inputs.transpose(1, d)).transpose(1, d)
+            outputs = self.linear(outputs)
             return outputs
 
         else:
-            outputs = self.linear1(inputs)
-            outputs = self.linear2(outputs)
+            outputs = self.linear(inputs)
             return outputs
 
 class ShellConv(nn.Module):
     def __init__(self, out_features, prev_features, neighbor, division, 
-            is_batchnorm=True):
+            has_bn=True):
         super(ShellConv, self).__init__() 
         """
         out_features  (int) num of output feature (dim = -1)
@@ -106,14 +114,15 @@ class ShellConv(nn.Module):
 
         self.K = neighbor
         self.S = int(self.K/division) # num of feaure per shell
-        self.point_feature = 64
+        self.F = 64 # num of local point features
         self.neighbor = neighbor
-        in_channel = self.point_feature + prev_features
+        in_channel = self.F + prev_features
         out_channel = out_features
 
-        self.lift = Lift(3, self.point_feature)
+        self.dense1 = Dense(3, self.F // 2, in_dim=4, has_bn=has_bn)
+        self.dense2 = Dense(self.F // 2, self.F, in_dim=4, has_bn=has_bn)
         self.maxpool = nn.MaxPool2d((1, self.S), stride = (1, self.S))
-        if is_batchnorm == True:
+        if has_bn == True:
             self.conv = nn.Sequential(
                 nn.BatchNorm2d(in_channel),
                 nn.Conv2d(in_channel, out_channel, (1, division)),
@@ -125,25 +134,26 @@ class ShellConv(nn.Module):
                 nn.ReLU(),
             )
         
-    def forward(self, points, queries, feat_prev):
+    def forward(self, points, queries, prev_features):
         """
         Args:
-            points      (B x N x 3 tensor)
-            query       (B x M x 3 tensor) -- note that M < N
-            feat_prev   (B x N x F1 tensor)
+            points          (B x N x 3 tensor)
+            query           (B x M x 3 tensor) -- note that M < N
+            prev_features   (B x N x F1 tensor)
         Outputs:
-            feat        (B x M x F2 tensor)
+            feat            (B x M x F2 tensor)
         """
 
         knn_pts, idxs = knn(points, queries, self.K)
         knn_center    = queries.unsqueeze(2)
         knn_points_local = knn_center - knn_pts
 
-        knn_feat_local = self.lift(knn_points_local)
+        knn_feat_local = self.dense1(knn_points_local)
+        knn_feat_local = self.dense2(knn_feat_local)
 
         # shape: B x M x K x F
-        if feat_prev is not None:
-            knn_feat_prev = gather_feature(feat_prev, idxs)
+        if prev_features is not None:
+            knn_feat_prev = gather_feature(prev_features, idxs)
             knn_feat_cat  = torch.cat((knn_feat_local, knn_feat_prev), dim=-1)
         else:
             knn_feat_cat  = knn_feat_local 
@@ -152,62 +162,45 @@ class ShellConv(nn.Module):
         knn_feat_max = self.maxpool(knn_feat_cat)
         output   = self.conv(knn_feat_max).permute(0,2,3,1)
 
-        print("knn_feat_local.shape = {}, feat_cat shape = {}, feat max shape = {}".format(
-            knn_feat_local.shape, knn_feat_cat.shape, knn_feat_max.shape))
-
         return output.squeeze(2)
 
 class ShellUp(nn.Module):
     def __init__(self, out_features, prev_features, neighbor, division, 
-            is_batchnorm=True):
+            has_bn=True):
         super(ShellUp, self).__init__()
-        self.is_batchnorm = is_batchnorm
+        self.has_bn = has_bn
         self.sconv = ShellConv(out_features, prev_features, neighbor,
-            division, is_batchnorm)
-        self.batchnorm = nn.BatchNorm1d(2 * out_features)
-        self.linear    = nn.Sequential(
-            nn.Linear(2 * out_features, out_features),
-            nn.ReLU()
-        )
-    def forward(self, points, queries, feat_prev, feat_skip_connect):
-        sconv = self.sconv(points, queries, feat_prev)
+            division, has_bn)
+        self.dense = Dense(2 * out_features, out_features, has_bn=has_bn)
+
+    def forward(self, points, queries, prev_features, feat_skip_connect):
+        sconv = self.sconv(points, queries, prev_features)
         feat_cat = torch.cat((sconv, feat_skip_connect), dim=-1)
-        print("shell up feat_cat.shape = ",feat_cat.shape)
-        if self.is_batchnorm == True:
-            outputs = self.batchnorm(feat_cat.transpose(1,2)).transpose(1,2)
-            outputs = self.linear(outputs)
-        else:
-            outputs = self.linear(feat_cat)
+
+        outputs = self.dense(feat_cat)
         return outputs
 
 
 class ShellNet(nn.Module):
-    def __init__(self, num_class, num_points, is_batchnorm=True):
+    def __init__(self, num_class, num_points, 
+            conv_scale=1, dense_scale=1, has_bn=True):
         super(ShellNet, self).__init__()
         self.num_points = num_points
-        self.filter_scale = 1
-        self.feature_scale = 1
-
         filters = [64, 128, 256, 512]
-        filters = [int(x / self.filter_scale) for x in filters]
+        filters = [int(x / conv_scale) for x in filters]
 
-        self.shellconv1 = ShellConv(filters[1],   0, 32, 4, is_batchnorm)
-        self.shellconv2 = ShellConv(filters[2], filters[1], 16, 2, is_batchnorm)
-        self.shellconv3 = ShellConv(filters[3], filters[2],  8, 1, is_batchnorm)        
-        self.shellup3   = ShellUp(  filters[2], filters[3],  8, 1, is_batchnorm)
-        self.shellup2   = ShellUp(  filters[1], filters[2], 16, 2, is_batchnorm)
-        self.shellup1   = ShellConv(filters[0], filters[1], 32, 4, is_batchnorm)
+        features = [256, 128]
+        features = [int(x / dense_scale) for x in features]
 
-        self.fc = nn.Sequential(
-            nn.Linear(64, 256),
-            nn.Dropout(0),
-            nn.ReLU(),
-            nn.Linear(256,128),
-            nn.Dropout(0.5),
-            nn.ReLU(),
-            nn.Linear(128, num_class),
-            nn.ReLU()
-        )
+        self.shellconv1 = ShellConv(filters[1],   0, 32, 4, has_bn)
+        self.shellconv2 = ShellConv(filters[2], filters[1], 16, 2, has_bn)
+        self.shellconv3 = ShellConv(filters[3], filters[2],  8, 1, has_bn)        
+        self.shellup3   = ShellUp(  filters[2], filters[3],  8, 1, has_bn)
+        self.shellup2   = ShellUp(  filters[1], filters[2], 16, 2, has_bn)
+        self.shellup1   = ShellConv(filters[0], filters[1], 32, 4, has_bn)
+        self.fc1 = Dense( filters[0], features[0], has_bn=has_bn, drop_out=0)
+        self.fc2 = Dense(features[0], features[1], has_bn=has_bn, drop_out=0.5)
+        self.fc3 = Dense(features[1],   num_class, has_bn=has_bn)
 
     def forward(self, inputs):
         
@@ -234,8 +227,14 @@ class ShellNet(nn.Module):
         up1    = self.shellup1(query1, inputs, up2)
         print("up1.shape = ", up1.shape)
 
-        output = self.fc(up1)
-        print("output.shape = ", output.shape)
+        fc1 = self.fc1(up1)
+        print("fc1.shape = ", fc1.shape)
+
+        fc2 = self.fc2(fc1)
+        print("fc2.shape = ", fc2.shape)
+
+        output = self.fc3(fc2)
+        print("fc3.shape = ", output.shape)
 
         return output
 
@@ -251,5 +250,5 @@ nn_center    = q.unsqueeze(2)
 nn_points_local = nn_center - nn_pts
 
 
-model = ShellNet(2, 1024)
-print(model(q).shape)
+model = ShellNet(2, 1024, conv_scale=1, dense_scale=1)
+print(model(p).shape)
