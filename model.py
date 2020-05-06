@@ -28,7 +28,7 @@ def knn(points, queries, K):
         idxs  = idxs.unsqueeze(0)
         indices = idxs if indices is None else torch.cat((indices, idxs))
         
-    return value, indices
+    return value.long(), indices.long()
 
 def gather_feature(features, indices):
     """
@@ -206,49 +206,51 @@ class ShellNet(nn.Module):
         
         query1 = random_sample(inputs, self.num_points // 2)
         sconv1 = self.shellconv1(inputs, query1, None)
-        print("sconv1.shape = ", sconv1.shape)
+        #print("sconv1.shape = ", sconv1.shape)
 
         
         query2 = random_sample(query1, self.num_points // 4)
         sconv2 = self.shellconv2(query1, query2, sconv1)
-        print("sconv2.shape = ", sconv2.shape)
+        #print("sconv2.shape = ", sconv2.shape)
 
         query3 = random_sample(query2, self.num_points // 8)
         sconv3 = self.shellconv3(query2, query3, sconv2)
-        print("sconv3.shape = ", sconv3.shape)        
+        #print("sconv3.shape = ", sconv3.shape)        
         
         
         up3    = self.shellup3(query3, query2, sconv3, sconv2)
-        print("up3.shape = ", up3.shape)
+        #print("up3.shape = ", up3.shape)
 
         up2    = self.shellup2(query2, query1, up3   , sconv1)
-        print("up2.shape = ", up2.shape)
+        #print("up2.shape = ", up2.shape)
 
         up1    = self.shellup1(query1, inputs, up2)
-        print("up1.shape = ", up1.shape)
+        #print("up1.shape = ", up1.shape)
 
         fc1 = self.fc1(up1)
-        print("fc1.shape = ", fc1.shape)
+        #print("fc1.shape = ", fc1.shape)
 
         fc2 = self.fc2(fc1)
-        print("fc2.shape = ", fc2.shape)
+        #print("fc2.shape = ", fc2.shape)
 
         output = self.fc3(fc2)
-        print("fc3.shape = ", output.shape)
+        #print("fc3.shape = ", output.shape)
 
         return output
 
-B, M, K = 1, 1024, 32
-# Create random Tensors to hold inputs and outputs
-p = torch.randn(B, M, 3)
-q = torch.randn(B, M//2, 3)
-f = torch.randn(B, M, 128)
-y = torch.randn(B, M//2, 128)
 
-nn_pts, idxs = knn(p, q, 32)
-nn_center    = q.unsqueeze(2)
-nn_points_local = nn_center - nn_pts
+if __name__ == '__main__':
+    B, M, K = 1, 1024, 32
+    # Create random Tensors to hold inputs and outputs
+    p = torch.randn(B, M, 3)
+    q = torch.randn(B, M//2, 3)
+    f = torch.randn(B, M, 128)
+    y = torch.randn(B, M//2, 128)
+
+    nn_pts, idxs = knn(p, q, 32)
+    nn_center    = q.unsqueeze(2)
+    nn_points_local = nn_center - nn_pts
 
 
-model = ShellNet(2, 1024, conv_scale=1, dense_scale=1)
-print(model(p).shape)
+    model = ShellNet(2, 1024, conv_scale=1, dense_scale=1)
+    print(model(p).shape)
