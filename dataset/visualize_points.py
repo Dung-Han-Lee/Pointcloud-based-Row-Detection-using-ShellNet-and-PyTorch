@@ -10,69 +10,9 @@ import tkinter as tk
 SCALE = 10
 DEMO_IMAGE_WIDTH  = 500
 DEMO_IMAGE_HEIGHT = 500
+VELODYNE_VERTICAL_RES = radians(2)
+VELODYNE_VERTICAL_MIN_ANGLE = radians(-15)
 VELODYNE_NUM_BEAMS = 16
-VELODYNE_VERTICAL_MAX_ANGLE = radians(15)
-
-def topview(pointcloud):
-    """
-    Args:
-        pointcloud: 
-            N x D (D>=3), numpy array of 3D point coordinates in lidar sensor frame
-            the corresponding fields are x,y,z,intensity etc
-    Returns:
-        image with following correspondance:
-            x (forward in sensor frame) -> row
-            y (horizon in sensor frame) -> col
-    """
-    img = np.zeros((DEMO_IMAGE_HEIGHT, DEMO_IMAGE_WIDTH))
-    (x, y, z) = (pointcloud[:, 0], pointcloud[:, 1], pointcloud[:, 2])
-
-    # Scale values (c=0 corres to center line)
-    c = SCALE * y + DEMO_IMAGE_WIDTH/2
-    r = x * SCALE
-    z = 255 * (z - np.min(z))/(np.max(z) - np.min(z))
-
-    # Mask out invalid points
-    valid = (r >= 0) & (r < DEMO_IMAGE_HEIGHT - 1) &\
-            (c >= 0) & (c < DEMO_IMAGE_WIDTH  - 1)
-
-    r = np.rint(r).astype('int')
-    c = np.rint(c).astype('int')
-    rvalid = r[valid]
-    cvalid = c[valid]
-    zvalid = z[valid]
-
-    img[rvalid, cvalid] = zvalid
-
-    # Flip the image so r=0 is at btm, c=0 at right
-    img = np.fliplr(img)
-    img = np.flipud(img)
-
-    return img
-
-def get_tree_indices(pointcloud, topview):
-    """
-    Args:
-        pointcloud  (N X 3 numpy float64) corresponding to label pixels (x, y, z)
-        topview     (H x W numpy float64)  
-    Returns:
-        indices     (M, numpy) indices corresponding to trees 
-    """
-    topview = np.fliplr(np.flipud(topview))
-    res = []
-    for point in pointcloud:
-        x, y, z = point
-        c = SCALE * y + DEMO_IMAGE_WIDTH/2
-        r = x * SCALE
-        (r, c) = map(lambda x : np.rint(x).astype('int'), (r, c))
-        if r < 0 or r >= DEMO_IMAGE_HEIGHT or c < 0 or c >= DEMO_IMAGE_WIDTH:
-            v = 0
-        else:    
-            v = 1 if (topview[r, c] > 200) else 0
-        res.append(v)
-
-    return np.array(res)
-
 
 def show_semantic(label, pointcloud, view='front'):
     """
@@ -114,83 +54,86 @@ def show_semantic(label, pointcloud, view='front'):
     ax.set_zlim3d(-10,10)
     #plt.show()
 
-def image_histogram_equalization(image, number_bins=256):
-    # from http://www.janeriksolem.net/yrange9/06/histogram-equalization-with-python-and.html
+def register_label(label_img):
+    h, w = label_img.shape
+    compressed = np.zeros((int(h/4), w))
+    for i in range(h):
+        if(i%4==0):
+            compressed[int(i/4)] = label_img[i]
+    label_img = compressed
+    return np.fliplr(label_img)
 
-    # get image histogram
-    image_histogram, bins = np.histogram(image.flatten(), number_bins, density=True)
-    cdf = image_histogram.cumsum() # cumulative distribution function
-    cdf = 255 * cdf / cdf[-1] # normalize
+def get_row_indices(pointcloud, label_img, theta_min=-pi/2, theta_max=pi/2):
+    """
+    Args:
+        pointcloud: 
+            Nx4 numpy array of 3D point coordinates in lidar sensor frame
+            the corresponding fields are x,y,z,intensity
+        theta_max/min:  
+            the allowed horizontal theta range with forward defined as 0, 
+            left as pi/2 (due to arctan2 property) 
 
-    # use linear interpolation of cdf to find new pixel values
-    image_equalized = np.interp(image.flatten(), bins[:-1], cdf)
+    Returns:
+        Range view image
 
-    return image_equalized.reshape(image.shape)
+    Notes: 
+        z is align with rotation axis pointing outward from the top of device
+        x pointing forward (due to ROS convention) 
+    """
+    
+    # Convert cartesian to spherical
+    r = np.linalg.norm(pointcloud[:,0:3], axis=1)
+    phi = np.arccos(pointcloud[:,2] / r) - (pi / 2) # top: -pi/2, down: pi/2
+    theta = np.arctan2(pointcloud[:,1], pointcloud[:,0])
+
+    # Calculate vetical phi with top beam corrs to index 0, btm index 15
+    y = np.rint((phi - VELODYNE_VERTICAL_MIN_ANGLE) * (1./VELODYNE_VERTICAL_RES)).astype('int')
+
+    # Calculate horizontal theta with right corrs to index 0 (need flip later)
+    theta_step = radians(0.35)
+    x_len = 512
+    x = np.rint((theta - theta_min) * (1./theta_step)).astype('int')
+
+    # Force x range within [0, 512]
+    # Since row is always in center, these points would not be labeled as row
+    x[ x < 0 ] = 0
+    x[ x >= x_len] = 0
+
+    valid = label_img[y, x] == 255
+    return valid
 
 
-def EvaluateLabel(rot_y):
+
+if __name__ == '__main__':
     root = "."
     src_folder_names = ['train', 'val', 'test']
 
     for folder_name in src_folder_names:
         npz_folder = os.path.join(root, folder_name, "npz")
-        lbl_folder = os.path.join(root, folder_name, "pc_label")
+        lbl_folder = os.path.join(root, folder_name, "label")
+        out_pc_folder = os.path.join(root, folder_name, "pointcloud")
+        out_lbl_folder = os.path.join(root, folder_name, "pc_label")
         for i, npz_name in enumerate(sorted(os.listdir(npz_folder))):
+            pc = np.load(os.path.join(npz_folder, npz_name), allow_pickle=True)["pointcloud"][:, :3]
+            lbl = cv2.imread(os.path.join(lbl_folder, sorted(os.listdir(lbl_folder))[i]), 0)
+            lbl = register_label(lbl)
 
-            print(npz_name)
-            pc = np.load(os.path.join(npz_folder, npz_name), allow_pickle=True)["pointcloud"][:, :3] @ rot_y
-            img = cv2.imread(os.path.join(lbl_folder, sorted(os.listdir(lbl_folder))[i]), 0)
-            plt.imshow(img)
-            #plt.imshow(img > 20)
-            plt.show()
-            label = get_tree_indices(pc, img)
+            label_prefix = sorted(os.listdir(lbl_folder))[i][:-len("_visualize.png")]
+            npz_prefix = npz_name[:-len(".npz")]
+            #print("label prefix = {} must match npz prefix {}".format(label_prefix, npz_prefix))
+            assert label_prefix == npz_prefix, "label prefix must match npz prefix"
 
-            #import pdb
-            #pdb.set_trace()
-
+            label = get_row_indices(pc, lbl)
+            
+            # Subsample 1025 points
             idx = np.random.permutation(len(pc))[:1024]
             (pc, label) = map(lambda x : x[idx], (pc, label))
-            show_semantic(label, pc, view='top')
-            plt.show()
 
-def GenerateTopView(rot_y, viz=False):
-    root = "."
-    src_folder_names = ['train', 'val', 'test']
+            np.save(os.path.join(out_pc_folder, str(npz_prefix)) , pc)
+            np.save(os.path.join(out_lbl_folder, str(label_prefix)), label)
 
-    for folder_name in src_folder_names:
-        print(folder_name)
-        npz_folder = os.path.join(root, folder_name, "npz")
-        out_folder = os.path.join(root, folder_name, "pc_label")
-        for i, npz_name in enumerate(sorted(os.listdir(npz_folder))):
-            npz_path = os.path.join(npz_folder, npz_name)
-            pc = np.load(npz_path, allow_pickle=True)["pointcloud"][:, :3] @ rot_y
+            if i % 10 == 9:
+                show_semantic(label, pc, view='top')
+                plt.show()
             
-            print("showing {}-th npz = {}".format(i, npz_name))
-            
-            top = topview(pc)
-            out_path = os.path.join(out_folder, npz_name[:-len(".npz")]) + ".png"
-            cv2.imwrite(out_path , top)
-
-            if viz is True:            
-                plt.figure(1)
-                plt.switch_backend('TkAgg') #TkAgg (instead Qt4Agg)
-                for view in ['top']:
-                    idx = np.random.permutation(len(pc))[:1024]
-                    pc  = pc[idx]
-                    show_semantic(np.zeros(len(pc)), pc, view=view)
-                    mng = plt.get_current_fig_manager()
-                    mng.resize(*mng.window.maxsize())
-                    plt.pause(0.5)
-            
-if __name__ == '__main__':
-    
-
-    degree = -4
-    angle  = (degree/180)*pi
-    rot_y = np.array([  [ cos(angle), 0, sin(angle)],
-                        [          0, 1,         0] ,
-                        [-sin(angle), 0, cos(angle)]])
-
-    GenerateTopView(rot_y)
-    #EvaluateLabel(rot_y)
 
