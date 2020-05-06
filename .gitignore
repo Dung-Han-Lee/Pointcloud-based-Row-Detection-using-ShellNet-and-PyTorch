@@ -137,4 +137,6 @@ bags/
 /data/val
 /data/*.zip
 /train/runs
-/weight/*.pth
+/weights
+*.txt
+__init__.py
