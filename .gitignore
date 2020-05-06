@@ -133,3 +133,4 @@ bags/
 
 #development
 workspace/
+/weight/*.pth
