@@ -8,10 +8,15 @@ from torch.utils.tensorboard import SummaryWriter
 
 # User define module
 import config
+from faci_training import unique_id
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def train(model, data_loader, test_loader, criterion, optimizer):
+
+    msg = "lr = " + str(config.lr) + " batch sz = " + str(config.batch_size) + " weights = " + str(config.weights)
+    identifier = config.summary_prefix + "%02d" % unique_id(msg)
+
     model.train()
     writer = SummaryWriter("./runs/")
     start_time = time.time()
@@ -51,8 +56,8 @@ def train(model, data_loader, test_loader, criterion, optimizer):
         
         writer.add_scalars('loss', {'train': train_loss, 'val': val_loss}, epoch)
 
-        torch.save( model.state_dict(), "../weights/"+str(epoch)+".pth") 
-        
+        torch.save( model.state_dict(), "../weights/"+ identifier + "/" + str(epoch)+".pth") 
+
 def test_classify(model, test_loader, criterion, optimizer):
     model.eval()
     test_loss = []
