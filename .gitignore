@@ -132,5 +132,9 @@ bags/
 ../RIU_Net/data/
 
 #development
-workspace/
+/data/train
+/data/test
+/data/val
+/data/*.zip
+/train/runs
 /weight/*.pth
