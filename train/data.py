@@ -5,6 +5,7 @@ import torch
 from torch.utils import data
 from torchvision import transforms
 import scipy.misc as m
+from math import pi, cos, sin
 
 #User define modules
 import paths
@@ -34,5 +35,14 @@ class PointcloudDataset(data.Dataset):
         lbl_path = os.path.join(self.lbl_base, ("%04d" % index ) + ".npy")
         pc  = np.load( pc_path, allow_pickle=True)
         lbl = np.load(lbl_path, allow_pickle=True)
+        if self.mode == "train" or self.mode == "test":
+            pc = self.transform(pc)
+
         return pc, lbl
  
+    def transform(self, pointcloud):
+        ang = np.random.uniform(-pi, pi)
+        rot_z = np.array([  [cos(ang), -sin(ang), 0],
+                            [sin(ang),  cos(ang), 0],
+                            [       0,         0, 1]])
+        return pointcloud @ rot_z
