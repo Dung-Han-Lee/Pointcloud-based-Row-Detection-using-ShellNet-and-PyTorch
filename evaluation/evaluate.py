@@ -22,7 +22,7 @@ class Test:
         
         # Initialize model
         weight = torch.load(path_weight, map_location = self.device)
-        self.network = model.ShellNet(2, 1024, conv_scale=2, dense_scale=2)
+        self.network = model.ShellNet(2, 1024, conv_scale=1, dense_scale=1)
         self.network.load_state_dict(weight)
         self.network.eval()
         self.network.to(self.device)

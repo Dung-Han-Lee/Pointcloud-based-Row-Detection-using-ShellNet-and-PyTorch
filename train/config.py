@@ -5,7 +5,7 @@ Training
 '''
 
 # Sanity Check
-sanity = True
+sanity = False
 subset = 10
 
 # Learning parameters
