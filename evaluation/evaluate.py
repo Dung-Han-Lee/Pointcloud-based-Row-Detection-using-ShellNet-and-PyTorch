@@ -39,13 +39,6 @@ class Test:
         iou = []
         for num, (pointcloud, labels) in enumerate(test_loader):
             (pointcloud, labels) = map(lambda x : x.to(self.device), (pointcloud, labels))
-
-            angle = np.random.uniform(-pi/10, pi/10)
-            rot_z = np.array([  [cos(angle), -sin(angle), 0],
-                                [sin(angle),  cos(angle), 0],
-                                [         0,           0, 1]])
-
-            #pointcloud = pointcloud @ rot_z
             output = self.network(pointcloud.float()).detach().numpy() 
             output_class = np.argmax(output, axis=2).flatten()
             pc = pointcloud.squeeze(0).detach().numpy()
