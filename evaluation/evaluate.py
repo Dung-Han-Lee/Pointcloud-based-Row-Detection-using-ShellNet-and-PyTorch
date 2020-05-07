@@ -22,28 +22,21 @@ class Test:
         
         # Initialize model
         weight = torch.load(path_weight, map_location = self.device)
-        self.network = model.ShellNet(2, 1024, conv_scale=1, dense_scale=1)
+        self.network = model.ShellNet(2, 1024, conv_scale=2, dense_scale=2)
         self.network.load_state_dict(weight)
         self.network.eval()
         self.network.to(self.device)
 
     def evaluate(self, test_loader):
 
-        angle = pi/6#np.random.uniform(0, 0)
+        angle = np.random.uniform(0, 0)
         rot_z = np.array([  [cos(angle), -sin(angle), 0],
                             [sin(angle),  cos(angle), 0],
                             [         0,           0, 1]])
 
-        acc = []
+        iou = []
         for num, (pointcloud, labels) in enumerate(test_loader):
             (pointcloud, labels) = map(lambda x : x.to(self.device), (pointcloud, labels))
-
-            angle = pi/30 #np.random.uniform(-pi/10, pi/10)
-            rot_z = np.array([  [cos(angle), -sin(angle), 0],
-                                [sin(angle),  cos(angle), 0],
-                                [         0,           0, 1]])
-
-            pointcloud = pointcloud @ rot_z
             output = self.network(pointcloud.float()).detach().numpy() 
             output_class = np.argmax(output, axis=2).flatten()
             pc = pointcloud.squeeze(0).detach().numpy()
@@ -51,11 +44,12 @@ class Test:
             intersect = np.sum(labels.astype(np.bool) & output_class.astype(np.bool))
             union    = np.sum(labels.astype(np.bool) | output_class.astype(np.bool))
 
-            acc.append(intersect/union)
-            #show_semantic(output_class, pc, view='top')
-            #show_semantic(labels      , pc, view='top', color='g')
-            #plt.show()
-        print(np.mean(acc))
+            iou.append(intersect/union)
+            show_semantic(output_class, pc, view='top')
+            show_semantic(labels      , pc, view='top', color='g')
+            plt.show()
+        print(np.mean(iou))
+        
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Evalutate results of range image unet.')
@@ -67,5 +61,5 @@ if __name__ == '__main__':
     
     for path in (args["model"]):
         print(path)
-        test = Test(path) #best 0406_RIU03_60
+        test = Test(path)
         test.evaluate(test_loader)
