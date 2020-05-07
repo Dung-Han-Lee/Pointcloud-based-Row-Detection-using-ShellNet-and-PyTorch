@@ -63,7 +63,12 @@ def get_row_indices(pointcloud, label_img, theta_min=-pi/2, theta_max=pi/2):
     valid = label_img[y, x] == 255
     return valid
 
-
+def transform(pointcloud):
+    ang = np.random.uniform(-pi, pi)
+    rot_z = np.array([  [cos(ang), -sin(ang), 0],
+                        [sin(ang),  cos(ang), 0],
+                        [       0,         0, 1]])
+    return pointcloud @ rot_z
 
 if __name__ == '__main__':
     root = "."
@@ -94,6 +99,6 @@ if __name__ == '__main__':
             #np.save(os.path.join(out_lbl_folder, str(label_prefix)), label)
 
             if i % 10 == 9:
-                show_semantic(label, pc, view='top')
+                show_semantic(label, transform(pc), view='top')
             
 

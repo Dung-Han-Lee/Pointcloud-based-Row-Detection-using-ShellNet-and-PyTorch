@@ -36,12 +36,10 @@ class Test:
         for num, (pointcloud, labels) in enumerate(test_loader):
             (pointcloud, labels) = map(lambda x : x.to(self.device), (pointcloud, labels))
             output = self.network(pointcloud.float()).detach().numpy() 
-            #output_class = np.argmax(output, axis=2).flatten()
-            #pc = pointcloud.squeeze(0).detach().numpy() @ rot_z
-            #show_semantic(output_class, pc, view='top')
+            output_class = np.argmax(output, axis=2).flatten()
+            pc = pointcloud.squeeze(0).detach().numpy() @ rot_z
+            show_semantic(output_class, pc, view='top')
 
-            import pdb
-            pdb.set_trace()
 
 if __name__ == '__main__':
 
@@ -50,7 +48,7 @@ if __name__ == '__main__':
     args = vars(parser.parse_args())
 
     test_dataset  = data.PointcloudDataset(mode = 'test')
-    test_loader   = DataLoader(test_dataset, batch_size=2)
+    test_loader   = DataLoader(test_dataset)
     
     for path in (args["model"]):
         print(path)

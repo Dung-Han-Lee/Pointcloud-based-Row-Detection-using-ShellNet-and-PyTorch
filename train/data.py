@@ -35,7 +35,7 @@ class PointcloudDataset(data.Dataset):
         lbl_path = os.path.join(self.lbl_base, ("%04d" % index ) + ".npy")
         pc  = np.load( pc_path, allow_pickle=True)
         lbl = np.load(lbl_path, allow_pickle=True)
-        if self.mode == "train" or self.mode == "test":
+        if self.mode == "train":
             pc = self.transform(pc)
 
         return pc, lbl
