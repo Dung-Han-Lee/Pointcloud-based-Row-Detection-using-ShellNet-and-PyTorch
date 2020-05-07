@@ -6,7 +6,7 @@ import sys
 import cv2
 import os
 
-def show_semantic(label, pointcloud, view='front'):
+def show_semantic(label, pointcloud, view='front', color='r'):
     """
     Args:
         label      : (N, ) numpy semantic annotation of target of two classes [0, 1]
@@ -21,7 +21,7 @@ def show_semantic(label, pointcloud, view='front'):
 
     # Draw class 1
     pc2 = pointcloud[label==1, :]
-    ax.scatter(pc2[:, 0], pc2[:, 1], pc2[:, 2], s=3, c='r', marker='o')
+    ax.scatter(pc2[:, 0], pc2[:, 1], pc2[:, 2], s=3, c=color, marker='o')
 
     print("pc1 = {}, pc2 = {}, pointcloud = {}".format(pc1.shape, pc2.shape, pointcloud.shape))
 
