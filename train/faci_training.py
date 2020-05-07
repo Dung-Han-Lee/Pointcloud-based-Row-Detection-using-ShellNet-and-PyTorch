@@ -5,12 +5,9 @@ import os
 
 def unique_id(msg):
     ext = '.txt'
-    f = glob("../*"+ext)[0]
-    #import pdb
-    #pdb.set_trace()
-
-    num_trail = int(f.split("../")[1][0])
-    newf = "../" + str(num_trail+1) + ext
+    f = glob("*"+ext)[0]
+    num_trail = int(f.split(".")[0])
+    newf = "./" + str(num_trail+1) + ext
     os.rename(f, newf)
     outdir = os.path.join("../weights", config.summary_prefix+"%02d"%num_trail)
     mkdir_p(outdir)
