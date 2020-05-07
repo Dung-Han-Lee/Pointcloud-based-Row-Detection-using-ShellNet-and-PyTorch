@@ -198,6 +198,20 @@ class ShellNet(nn.Module):
         self.shellup3   = ShellUp(  filters[2], filters[3],  8, 1, has_bn)
         self.shellup2   = ShellUp(  filters[1], filters[2], 16, 2, has_bn)
         self.shellup1   = ShellConv(filters[0], filters[1], 32, 4, has_bn)
+
+        # Test
+        if has_bn == True:
+            self.final = nn.Sequential(
+                nn.BatchNorm1d(filters[0]),
+                nn.Conv1d(filters[0], num_class, 3, 1, 1),
+                nn.ReLU(),
+            )
+        else:
+            self.final = nn.Sequential(
+                nn.Conv1d(filters[0], num_class, 3, 1, 1),
+                nn.ReLU(),
+            )
+
         self.fc1 = Dense( filters[0], features[0], has_bn=has_bn, drop_out=0)
         self.fc2 = Dense(features[0], features[1], has_bn=has_bn, drop_out=0.5)
         self.fc3 = Dense(features[1],   num_class, has_bn=has_bn)
@@ -206,36 +220,39 @@ class ShellNet(nn.Module):
         
         query1 = random_sample(inputs, self.num_points // 2)
         sconv1 = self.shellconv1(inputs, query1, None)
-        #print("sconv1.shape = ", sconv1.shape)
+        print("sconv1.shape = ", sconv1.shape)
 
         
         query2 = random_sample(query1, self.num_points // 4)
         sconv2 = self.shellconv2(query1, query2, sconv1)
-        #print("sconv2.shape = ", sconv2.shape)
+        print("sconv2.shape = ", sconv2.shape)
 
         query3 = random_sample(query2, self.num_points // 8)
         sconv3 = self.shellconv3(query2, query3, sconv2)
-        #print("sconv3.shape = ", sconv3.shape)        
+        print("sconv3.shape = ", sconv3.shape)        
         
         
         up3    = self.shellup3(query3, query2, sconv3, sconv2)
-        #print("up3.shape = ", up3.shape)
+        print("up3.shape = ", up3.shape)
 
         up2    = self.shellup2(query2, query1, up3   , sconv1)
-        #print("up2.shape = ", up2.shape)
+        print("up2.shape = ", up2.shape)
 
         up1    = self.shellup1(query1, inputs, up2)
-        #print("up1.shape = ", up1.shape)
+        print("up1.shape = ", up1.shape)
 
+        output = self.final(up1.transpose(1,2)).transpose(1,2)
+
+        '''
         fc1 = self.fc1(up1)
-        #print("fc1.shape = ", fc1.shape)
+        print("fc1.shape = ", fc1.shape)
 
         fc2 = self.fc2(fc1)
-        #print("fc2.shape = ", fc2.shape)
+        print("fc2.shape = ", fc2.shape)
 
         output = self.fc3(fc2)
-        #print("fc3.shape = ", output.shape)
-
+        print("fc3.shape = ", output.shape)
+        '''
         return output
 
 
@@ -250,10 +267,6 @@ if __name__ == '__main__':
     nn_pts, idxs = knn(p, q, 32)
     nn_center    = q.unsqueeze(2)
     nn_points_local = nn_center - nn_pts
-
-
-    import pdb
-    pdb.set_trace()
 
     model = ShellNet(2, 1024, conv_scale=1, dense_scale=1)
     print(model(p).shape)
