@@ -35,7 +35,7 @@ def show_semantic(label, pointcloud, ground_truth=0, view='front', color='r'):
         ax.view_init(0, -180)
         plt.title('front')
     elif view == 'top':
-        ax.view_init(60,-180)
+        ax.view_init(90,-180)
         plt.title('top')
     elif view == 'side':
         ax.view_init(0, 90)
