@@ -17,11 +17,11 @@ Velodyne's VLP-16, which was mounted on a mobile agriculture robot.
          cd evaluation && python3 evaluation.py --model ../weight/shellnet01/91.pth
 
 ## Run using Ros
-* change subsriber channel as needed  
+change subsriber channel as needed  
 
          cd ros && python2.7 row_decection 
     
-## Input and target of ShellNet
+## Input and Target
 The model was trained with 150 sets of pointcloud data. The model takes as input  
 an downsampled pointcloud tensor (1024 x 3), and a label tensor (1024,) with each  
  element represents one of the N class in [0, N) 
