@@ -4,6 +4,7 @@ import sys
 import pdb
 import argparse
 from math import pi, radians, degrees, sin, cos
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
@@ -46,7 +47,9 @@ class Test:
             output_class = np.argmax(output, axis=2).flatten()
             pc = pointcloud.squeeze(0).detach().numpy()
             labels = labels.squeeze(0).detach().numpy()
-            show_semantic(output_class, labels, pc, view='top')
+            show_semantic(output_class, pc, view='top')
+            show_semantic(labels      , pc, view='top', color='g')
+            plt.show()
 
 if __name__ == '__main__':
 

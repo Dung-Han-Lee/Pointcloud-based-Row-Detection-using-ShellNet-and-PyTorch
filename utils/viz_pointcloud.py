@@ -24,7 +24,7 @@ def show_semantic(label, pointcloud, ground_truth=0, view='front', color='r'):
     ax.scatter(pc2[:, 0], pc2[:, 1], pc2[:, 2], s=3, c=color, marker='o')
 
     pc3 = pointcloud[ground_truth==1, :]
-    ax.scatter(pc3[:, 0], pc3[:, 1], pc3[:, 2], s=3, c='g', marker='o')
+    ax.scatter(pc3[:, 0], pc3[:, 1], pc3[:, 2], s=5, c='g', marker='o')
 
     print("pc1 = {}, pc2 = {}, pointcloud = {}".format(pc1.shape, pc2.shape, pointcloud.shape))
 
@@ -35,7 +35,7 @@ def show_semantic(label, pointcloud, ground_truth=0, view='front', color='r'):
         ax.view_init(0, -180)
         plt.title('front')
     elif view == 'top':
-        ax.view_init(90,-180)
+        ax.view_init(60,-180)
         plt.title('top')
     elif view == 'side':
         ax.view_init(0, 90)
@@ -47,4 +47,4 @@ def show_semantic(label, pointcloud, ground_truth=0, view='front', color='r'):
     ax.set_xlim3d(0,20)
     ax.set_ylim3d(-10,10)
     ax.set_zlim3d(-10,10)
-    plt.show()
+    #plt.show()
