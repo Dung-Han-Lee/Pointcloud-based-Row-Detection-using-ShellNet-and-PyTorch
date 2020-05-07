@@ -12,6 +12,7 @@ sys.path.append("../train")
 import model
 import data
 import paths
+import config
 sys.path.append("../utils")
 from viz_pointcloud import show_semantic
 
@@ -22,7 +23,8 @@ class Test:
         
         # Initialize model
         weight = torch.load(path_weight, map_location = self.device)
-        self.network = model.ShellNet(2, 1024, conv_scale=2, dense_scale=2)
+        self.network = model.ShellNet(2, 1024, conv_scale=config.conv_scale,
+            dense_scale=config.fc_scale)
         self.network.load_state_dict(weight)
         self.network.eval()
         self.network.to(self.device)
