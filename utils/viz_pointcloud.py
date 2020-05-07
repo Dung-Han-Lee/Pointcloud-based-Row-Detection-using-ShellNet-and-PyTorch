@@ -17,16 +17,14 @@ def show_semantic(label, pointcloud, ground_truth=0, view='front', color='r'):
 
     # Draw class 0
     pc1 = pointcloud[label==0, :]
-    ax.scatter(pc1[:, 0], pc1[:, 1], pc1[:, 2], c='b', marker='o')
+    ax.scatter(pc1[:, 0], pc1[:, 1], pc1[:, 2], s=1, c='b', marker='o')
 
     # Draw class 1
     pc2 = pointcloud[label==1, :]
-    ax.scatter(pc2[:, 0], pc2[:, 1], pc2[:, 2], c=color, marker='o')
+    ax.scatter(pc2[:, 0], pc2[:, 1], pc2[:, 2], s=3, c=color, marker='o')
 
     pc3 = pointcloud[ground_truth==1, :]
-    ax.scatter(pc3[:, 0], pc3[:, 1], pc3[:, 2], c='g', marker='o')
-
-    print("pc1 = {}, pc2 = {}, pointcloud = {}".format(pc1.shape, pc2.shape, pointcloud.shape))
+    ax.scatter(pc3[:, 0], pc3[:, 1], pc3[:, 2], s=3, c='g', marker='o')
 
     if view == 'front':
         ax.view_init(0, -180)
