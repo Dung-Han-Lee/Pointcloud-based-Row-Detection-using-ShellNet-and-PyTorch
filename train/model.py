@@ -199,21 +199,6 @@ class ShellNet(nn.Module):
         self.shellup2   = ShellUp(  filters[1], filters[2], 16, 2, has_bn)
         self.shellup1   = ShellConv(filters[0], filters[1], 32, 4, has_bn)
 
-        '''
-        # Test
-        if has_bn == True:
-            self.final = nn.Sequential(
-                nn.BatchNorm1d(filters[0]),
-                nn.Conv1d(filters[0], num_class, 3, 1, 1),
-                nn.ReLU(),
-            )
-        else:
-            self.final = nn.Sequential(
-                nn.Conv1d(filters[0], num_class, 3, 1, 1),
-                nn.ReLU(),
-            )
-        '''
-
         self.fc1 = Dense( filters[0], features[0], has_bn=has_bn, drop_out=0)
         self.fc2 = Dense(features[0], features[1], has_bn=has_bn, drop_out=0.5)
         self.fc3 = Dense(features[1],   num_class, has_bn=has_bn)
@@ -243,9 +228,6 @@ class ShellNet(nn.Module):
         up1    = self.shellup1(query1, inputs, up2)
         #print("up1.shape = ", up1.shape)
 
-        #output = self.final(up1.transpose(1,2)).transpose(1,2)
-
-        
         fc1 = self.fc1(up1)
         #print("fc1.shape = ", fc1.shape)
 
@@ -271,4 +253,4 @@ if __name__ == '__main__':
     nn_points_local = nn_center - nn_pts
 
     model = ShellNet(2, 1024, conv_scale=1, dense_scale=1)
-    #print(model(p).shape)
+    print(model(p).shape)
