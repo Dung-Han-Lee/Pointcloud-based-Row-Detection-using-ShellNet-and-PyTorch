@@ -45,9 +45,10 @@ def run():
     # Set up models and (optionally) load weights
     num_class = 2
     num_points = 1024
-    network = model.ShellNet(num_class, num_points)
+    network = model.ShellNet(num_class, num_points, 
+        conv_scale=config.conv_scale, dense_scale=config.fc_scale)
     if config.load:
-        state_dict = torch.load('./models/'+config.model)
+        state_dict = torch.load('../weights/'+config.model)
         network.load_state_dict(state_dict)
         print("loading weights from {}".format(config.model) )
 

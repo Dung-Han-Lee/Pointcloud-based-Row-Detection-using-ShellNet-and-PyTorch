@@ -41,7 +41,7 @@ class PointcloudDataset(data.Dataset):
         return pc, lbl
  
     def transform(self, pointcloud):
-        ang = np.random.uniform(-pi, pi)
+        ang = np.random.uniform(-pi/18, pi/18)
         rot_z = np.array([  [cos(ang), -sin(ang), 0],
                             [sin(ang),  cos(ang), 0],
                             [       0,         0, 1]])

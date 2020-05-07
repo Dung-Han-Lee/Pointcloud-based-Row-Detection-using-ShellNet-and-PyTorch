@@ -9,13 +9,19 @@ sanity = False
 subset = 10
 
 # Learning parameters
-weights = torch.tensor([0.05, 0.95]) # background, road
-lr = 1e-3
+weights = torch.tensor([0.1, 0.9]) # background, road
+lr = 3e-4
 summary_prefix = "shellnet"
-num_epoch = 50
-batch_size = 1
+num_epoch = 100
+batch_size = 32
 reg_factor = 0
+fc_scale = 1
+conv_scale = 1
 
 # Loading dicts
 load = False
+<<<<<<< HEAD
 model = None
+=======
+model ="/42.pth"
+>>>>>>> e467847b75cfe29b287ebaee11bbe20cd902c7bf
