@@ -15,13 +15,9 @@ summary_prefix = "shellnet"
 num_epoch = 100
 batch_size = 32
 reg_factor = 0
-fc_scale = 1
-conv_scale = 1
+fc_scale = 2
+conv_scale = 2
 
 # Loading dicts
 load = False
-<<<<<<< HEAD
-model = None
-=======
 model ="/42.pth"
->>>>>>> e467847b75cfe29b287ebaee11bbe20cd902c7bf
