@@ -1,7 +1,6 @@
 ## Pointcloud-based Row Detection for Agriculture Robot
 This repo contains python codes that detects traversible row for agriculture robots  
-using [ShellNet](https://arxiv.org/pdf/1908.06295.pdf). The model in this repo is a naive pytorch adoption of  
-[the authors'   
+using [ShellNet](https://arxiv.org/pdf/1908.06295.pdf). The model in this repo is a naive pytorch adoption of [the authors'   
 tensorflow release](https://github.com/hkust-vgd/shellnet). Note that the very same pipeline could be used for generic  
 object detection, and semantic segmentation, while this work only concerns about  
 detecting a single row without row switching.
