@@ -1,5 +1,6 @@
 ## To Train
-N.txt is used to track the number of trail. Please do not keep other .txt file in this folder.
+N.txt is used to track the number of trail. Please do not keep other .txt file in this folder.  
+
         python3 run.py
 
 ## Hyper Parameters
