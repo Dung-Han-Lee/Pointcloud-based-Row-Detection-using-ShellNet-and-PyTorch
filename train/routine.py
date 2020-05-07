@@ -14,11 +14,14 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def train(model, data_loader, test_loader, criterion, optimizer):
 
-    msg = "lr = " + str(config.lr) + " batch sz = " + str(config.batch_size) + " weights = " + str(config.weights)
+    msg = "lr = " + str(config.lr) + " batch sz = " + str(config.batch_size) + " weights = " +\
+	 str(config.weights) + " fc scale = " + str(config.fc_scale) + " conv scale = " +\
+	 str(config.conv_scale) + " load = " + str(config.load) + " model = " + str(config.model)
+    
     identifier = config.summary_prefix + "%02d" % unique_id(msg)
 
     model.train()
-    writer = SummaryWriter("./runs/")
+    writer = SummaryWriter("./runs/"+ identifier)
     start_time = time.time()
 
     for epoch in range(config.num_epoch):
@@ -38,7 +41,7 @@ def train(model, data_loader, test_loader, criterion, optimizer):
             
             avg_loss += loss.item()
 
-            if batch_num % 10 == 9:
+            if batch_num % 3 == 2:
                 print('Epoch: {}\tBatch: {}\tAvg-Loss: {:.4f}'.format(epoch+1, batch_num+1, avg_loss/10))
                 avg_loss = 0.0   
                 
