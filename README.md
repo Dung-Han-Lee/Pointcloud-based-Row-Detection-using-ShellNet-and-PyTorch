@@ -12,6 +12,15 @@ Velodyne's VLP-16, which was mounted on a mobile agriculture robot.
 
 [![Output sample](https://media.giphy.com/media/UU1XBSRqje99sNjoai/giphy.gif)](https://youtu.be/Aqm1NRiaRmg)
 
+## ShellNet
+Proposed in 2019, ShellNet was designed to process pointcloud data directly. The  
+authors introduced a new method called shell convolution. Essentially, it obtains  
+sorted k nearest neighbor, divides them into D cells, selects the maximum feature  
+from each cell, and finally combines the features from each cell with a traditio-  
+nal 1D convolution. The network is then constructed with multi-layers of shellconv  
+layers, using an encoder-decoder architecture like UNet.
+
+<img src="./assets/shellnet_arch.png" width="600" height="300">
 
 ## Run with Visualization
 download data using link in ./data/README.md and put them under /data
@@ -32,7 +41,7 @@ an downsampled pointcloud tensor (1024 x 3), and a label tensor (1024,) with eac
 <img src="./assets/success_example.png" width="600" height="260">
 
 ## Limitations
-The network was mostly trained data facing forward, with vehicle standing in the center.  
+The network was mostly trained on data facing forward, with vehicle standing in the center.  
 The behavior when the vehicle has different orientation is poorer. It could make more  
 sense to detect vineyard instead of rows.  
 
